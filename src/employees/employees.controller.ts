@@ -25,4 +25,9 @@ export class EmployeesController {
     async updateEmployeeSalary(@Param('id')id ,@Body() data:any){
         return this.employeesService.updateSalaryByEmployeeId(id,data)
     }
+    @Delete(':employee_id')
+    async deleteReportByReportID(@Param('employee_id') employee_id:string){
+        return await this.employeesService.deleteReportByEmployeeId(employee_id)
+        
+    }
 }

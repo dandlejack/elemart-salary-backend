@@ -49,4 +49,8 @@ export class EmployeesService {
             return 'successful'
         }
     }
+
+    async deleteReportByEmployeeId(employee_id: string) {
+        return await this.employeesModel.deleteOne({ employees_id: employee_id })
+    }
 }
