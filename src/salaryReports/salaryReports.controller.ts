@@ -1,4 +1,4 @@
-import { Body, Controller, Delete,  Get, Param, Post, Put, Req, Res  } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res } from '@nestjs/common';
 import { SalaryReportsService } from './salaryReports.service';
 import { Request, Response } from 'express';
 
@@ -8,31 +8,34 @@ export class SalaryReportsController {
 
     }
     @Post('/AddReport')
-    insert(@Body() data:any){
+    insert(@Body() data: any) {
         return this.salaryReportService.insertReport(data)
     }
 
     @Get('/findall')
     async findAll(@Req() req: Request, @Res() res: Response) {
-        const result = await this.salaryReportService.findAll(req,res)
+        const result = await this.salaryReportService.findAll(req, res)
         res.send(result)
     }
 
     @Get('/findSalaryList')
     async findSalaryList(@Req() req: Request, @Res() res: Response) {
-        const result = await this.salaryReportService.findSalaryList(req,res)
+        const result = await this.salaryReportService.findSalaryList(req, res)
         res.send(result)
     }
     @Get('/findTotalSecuritySocialAndLate')
     async findTotalSecuritySocial(@Req() req: Request, @Res() res: Response) {
-        const result = await this.salaryReportService.findTotalSecuritySocialAndLate(req,res)
+        const result = await this.salaryReportService.findTotalSecuritySocialAndLate(req, res)
         res.send(result)
     }
-    
+    @Put('/:id')
+    async updateReport(@Param('id') id, @Body() data: any) {
+        return this.salaryReportService.updateReportByReportID(id, data)
+    }
     @Delete(':report_id')
-    async deleteReportByReportID(@Param('report_id') report_id:string){
+    async deleteReportByReportID(@Param('report_id') report_id: string) {
         return await this.salaryReportService.deleteReportByReportID(report_id)
-        
+
     }
 
     // @Get('/:id')

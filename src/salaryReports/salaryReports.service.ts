@@ -27,17 +27,17 @@ export class SalaryReportsService {
         let sum_late = 0
         let sum_absent = 0
         let sum_lending = 0
-        // const rawData = await this.salaryReportsModel.aggregate([{$match:{"attributes.fullname":'นส.ณิชชารีย์ ขำเข็มแก้ว',year_of_report:'2021'}}])
         const rawData = await this.salaryReportsModel.aggregate([{ $match: filterObject }])
+        // console.log(rawData)
         if (rawData.length > 0) {
             rawData.map(data => {
                 data.attributes.map(d => {
-                    if(d.fullname === params['attributes.fullname']){
+                    if (d.fullname === params['attributes.fullname']) {
                         sum_security_social += d.social_security
                         sum_late += d.late
                         sum_absent += d.absent
                         sum_lending += d.lending
-                    }                    
+                    }
                 })
             })
             const result = {
@@ -56,7 +56,7 @@ export class SalaryReportsService {
 
     async findSalaryList(req, res) {
         const sort = {
-            month_report:1
+            month_report: 1
         }
         const rawData = await this.salaryReportsModel.find().sort(sort).exec()
         const result = rawData.map(data => {
@@ -87,6 +87,13 @@ export class SalaryReportsService {
         return await this.salaryReportsModel.deleteOne({ report_id: report_id })
     }
 
+    async updateReportByReportID(report_id, data) {
+        const curDate = new Date(Date.now())
+        const result = await this.salaryReportsModel.updateOne({ report_id: report_id }, { attributes: data.attributes, updateDate: curDate })
+        if (result.ok === 1) {
+            return 'successful'
+        }
+    }
     // async findAllEmployees() {
     //     const rawData = await this.employeesModel.find().exec()
     //     const result = rawData.map(data=>{
