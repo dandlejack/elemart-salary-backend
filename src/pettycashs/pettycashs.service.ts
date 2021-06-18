@@ -48,7 +48,6 @@ export class PettycashsService {
   }
 
   async remove(id: string) {
-    console.log(`This action removes a #${id} pettycash`)
     await this.pettyCashsModel.deleteOne({pettycash_id:id})
     return `This action removes a #${id} pettycash`;
   }
