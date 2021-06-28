@@ -94,6 +94,36 @@ export class SalaryReportsService {
             return 'successful'
         }
     }
+
+    async getLateSalary(req, res) {
+        var result = {}
+        const chartResult = {}
+        const label = []
+        const chartData = []
+        const filterObject = req.query.filterObject && JSON.parse(req.query.filterObject as string) || {};
+        result[`attributes.${filterObject.type}`] = -1
+        const t = await this.salaryReportsModel.aggregate([
+            {
+                $match: { month_report: filterObject.month_report }
+            },
+            {
+                $unwind: "$attributes"
+            },
+            {
+                $sort: result
+            }
+        ])
+        t.map(d => {
+            label.push(d['attributes'][`fullname`])
+            chartData.push(d['attributes'][`${filterObject.type}`])
+        })
+        chartResult['label'] = label
+        chartResult['data'] = chartData
+        // console.log(chartData)
+        // console.log(JSON.parse(JSON.stringify(rawResult[0].attributes)))
+        // console.log(JSON.parse(JSON.stringify(t)))
+        return chartResult
+    }
     // async findAllEmployees() {
     //     const rawData = await this.employeesModel.find().exec()
     //     const result = rawData.map(data=>{

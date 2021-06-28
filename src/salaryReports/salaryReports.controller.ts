@@ -1,4 +1,4 @@
-import { Body, Controller, Delete, Get, Param, Post, Put, Req, Res } from '@nestjs/common';
+import { Body, Controller, Delete, Get, Param, Post, Put, Req,  Res } from '@nestjs/common';
 import { SalaryReportsService } from './salaryReports.service';
 import { Request, Response } from 'express';
 
@@ -15,6 +15,12 @@ export class SalaryReportsController {
     @Get('/findall')
     async findAll(@Req() req: Request, @Res() res: Response) {
         const result = await this.salaryReportService.findAll(req, res)
+        res.send(result)
+    }
+
+    @Get('/getLateSalary')
+    async getLateSalary(@Req() req: Request, @Res() res: Response) {
+        const result = await this.salaryReportService.getLateSalary(req, res)
         res.send(result)
     }
 
