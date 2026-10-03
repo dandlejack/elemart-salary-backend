@@ -2,6 +2,7 @@ import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose'
 import { generateUserId } from 'src/util/generateUserId';
+import { normalizeName } from 'src/util/normalizeName';
 import { EmployeeProps } from './employees.model';
 
 @Injectable()
@@ -14,11 +15,13 @@ export class EmployeesService {
     async insertEmployee(data: EmployeeProps) {
         const curDate = new Date(Date.now())
         data.employees_id = generateUserId(19)
-        data.fullname = data.firstname+' '+data.lastname
+        data.firstname = normalizeName(data.firstname)
+        data.lastname = normalizeName(data.lastname)
+        data.fullname = normalizeName(data.firstname+' '+data.lastname)
         data.createdDate = curDate
         data.updateDate = curDate
         const createdNewEmployee = new this.employeesModel(data)
-        createdNewEmployee.save()
+        await createdNewEmployee.save()
         const result = {
             success: true,
             data: 'successful'

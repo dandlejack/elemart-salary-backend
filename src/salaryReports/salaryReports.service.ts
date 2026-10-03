@@ -1,13 +1,41 @@
 import { Injectable } from '@nestjs/common';
 import { InjectModel } from '@nestjs/mongoose';
 import { Model } from 'mongoose'
-import { EmployeeProps } from 'src/employees/employees.model';
 import { generateUserId } from 'src/util/generateUserId';
+import { compareMonthReport, parseMonthReport } from 'src/util/monthReport';
+import { normalizeName } from 'src/util/normalizeName';
 import { SalaryReportsProps } from './salaryReports.model';
-interface ISaralyList {
-    report_id: string;
-    month_report: string;
+
+const NUMERIC_FIELDS = ['absent', 'agent', 'agent_tax', 'allowance', 'bonus', 'bonus_tax', 'fuel', 'late', 'lending', 'overtime', 'salary', 'social_security', 'tax', 'fund']
+
+// Query values must be plain strings; express parses `x[$ne]=` into objects.
+const queryString = (value: any): string | undefined => typeof value === 'string' && value !== '' ? value : undefined
+
+const toNumber = (value: any): number => {
+    if (typeof value === 'number') return value
+    if (typeof value === 'string' && value.trim() !== '' && !isNaN(Number(value))) return Number(value)
+    return 0
 }
+
+// `fullname` is expected normalized; stored names may still have extra spaces from before names were normalized.
+const matchesEmployee = (row: any, employees_id?: string, fullname?: string) =>
+    (employees_id !== undefined && row.employees_id === employees_id) || (fullname !== undefined && normalizeName(row.fullname) === fullname)
+
+// Matches a normalized name regardless of extra spaces in the stored value.
+const fullnameRegex = (fullname: string) =>
+    new RegExp('^\\s*' + fullname.split(' ').map(part => part.replace(/[.*+?^${}()|[\]\\]/g, '\\$&')).join('\\s+') + '\\s*$')
+
+// Drop UI-only fields (the table's delete button), normalize names and store numeric strings as numbers.
+const sanitizeAttributes = (attributes: any[]) => (attributes || []).map(row => {
+    const { operation, ...rest } = row
+    rest.fullname = normalizeName(rest.fullname)
+    NUMERIC_FIELDS.forEach(field => {
+        const value = rest[field]
+        if (typeof value === 'string' && value.trim() !== '' && !isNaN(Number(value))) rest[field] = Number(value)
+    })
+    return rest
+})
+
 @Injectable()
 export class SalaryReportsService {
     constructor(@InjectModel('SalaryReport') private salaryReportsModel: Model<SalaryReportsProps>) { }
@@ -20,52 +48,52 @@ export class SalaryReportsService {
         return result
     }
 
+    // Year-to-date totals for one employee, up to and including the selected report.
     async findTotalSecuritySocialAndLate(req, res) {
-        const params = JSON.parse(req.query.filterObject)
-        const filterObject = req.query.filterObject && JSON.parse(req.query.filterObject as string) || {};
-        let sum_security_social = 0
-        let sum_late = 0
-        let sum_absent = 0
-        let sum_lending = 0
-        const rawData = await this.salaryReportsModel.aggregate([{ $match: filterObject }])
-        // console.log(rawData)
-        if (rawData.length > 0) {
-            rawData.map(data => {
-                data.attributes.map(d => {
-                    if (d.fullname === params['attributes.fullname']) {
-                        sum_security_social += d.social_security
-                        sum_late += d.late
-                        sum_absent += d.absent
-                        sum_lending += d.lending
-                    }
-                })
-            })
-            const result = {
-                fullname: rawData[0].attributes[0].fullname,
-                total_security_social: sum_security_social,
-                total_late: sum_late,
-                total_absent: sum_absent,
-                total_lending: sum_lending
-            }
-            return result
-        } else {
-            return `don't have data`
+        const report_id = queryString(req.query.report_id)
+        const employees_id = queryString(req.query.employees_id)
+        const fullname = normalizeName(queryString(req.query.fullname))
+        const result = {
+            total_security_social: 0,
+            total_late: 0,
+            total_absent: 0,
+            total_lending: 0,
+            total_fund: 0
         }
+        if (!report_id || (!employees_id && !fullname)) return result
 
+        const selected = await this.salaryReportsModel.findOne({ report_id: report_id }).exec()
+        if (!selected) return result
+        const year = parseMonthReport(selected.month_report).year
+        const reports = await this.salaryReportsModel.find({ year_of_report: String(year) }).exec()
+        reports
+            .filter(report => compareMonthReport(report.month_report, selected.month_report) <= 0)
+            .forEach(report => report.attributes
+                .filter(row => matchesEmployee(row, employees_id, fullname))
+                .forEach(row => {
+                    result.total_security_social += toNumber(row.social_security)
+                    result.total_late += toNumber(row.late)
+                    result.total_absent += toNumber(row.absent)
+                    result.total_lending += toNumber(row.lending)
+                    result.total_fund += toNumber(row.fund)
+                }))
+        return result
     }
 
+    // All reports in month order, or only those containing the given employee.
     async findSalaryList(req, res) {
-        const sort = {
-            month_report: 1
-        }
-        const rawData = await this.salaryReportsModel.find().sort(sort).exec()
-        const result = rawData.map(data => {
-            return {
+        const employees_id = queryString(req.query.employees_id)
+        const fullname = normalizeName(queryString(req.query.fullname))
+        const or = []
+        if (employees_id) or.push({ 'attributes.employees_id': employees_id })
+        if (fullname) or.push({ 'attributes.fullname': fullnameRegex(fullname) })
+        const rawData = await this.salaryReportsModel.find(or.length > 0 ? { $or: or } : {}, { report_id: 1, month_report: 1 }).exec()
+        return rawData
+            .map(data => ({
                 report_id: data.report_id,
                 month_report: data.month_report
-            }
-        })
-        return result
+            }))
+            .sort((a, b) => compareMonthReport(a.month_report, b.month_report))
     }
 
     async insertReport(data: SalaryReportsProps) {
@@ -73,9 +101,10 @@ export class SalaryReportsService {
         data.report_id = generateUserId(30)
         data.createdDate = curDate
         data.updateDate = curDate
+        data.attributes = sanitizeAttributes(data.attributes)
 
         const createdNewReport = new this.salaryReportsModel(data)
-        createdNewReport.save()
+        await createdNewReport.save()
         const result = {
             success: true,
             data: 'successful'
@@ -89,7 +118,7 @@ export class SalaryReportsService {
 
     async updateReportByReportID(report_id, data) {
         const curDate = new Date(Date.now())
-        const result = await this.salaryReportsModel.updateOne({ report_id: report_id }, { attributes: data.attributes, updateDate: curDate })
+        const result = await this.salaryReportsModel.updateOne({ report_id: report_id }, { attributes: sanitizeAttributes(data.attributes), updateDate: curDate })
         if (result.ok === 1) {
             return 'successful'
         }
@@ -133,7 +162,7 @@ export class SalaryReportsService {
     //             current_salary:data.current_salary,
     //             social_security:data.social_security
     //         }
-    //     })        
+    //     })
     //     return result
     // }
 
