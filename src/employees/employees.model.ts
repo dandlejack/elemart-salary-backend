@@ -17,6 +17,11 @@ export class Employee {
     current_salary: number;
     @Prop()
     social_security: number;
+    // 'active' or 'resigned'; employees created before this field existed count as active.
+    @Prop()
+    status: string;
+    @Prop()
+    resigned_date: Date;
     @Prop()
     createdDate: Date;
     @Prop()
@@ -30,6 +35,8 @@ export interface EmployeeProps extends mongoose.Document {
     fullname: string;
     current_salary: number;
     social_security: number;
+    status: string;
+    resigned_date: Date;
     createdDate: Date;
     updateDate: Date;
 }
