@@ -21,6 +21,7 @@ interface AttributesProps {
     salary: number
     social_security: number
     tax: number
+    fund?: number
 }
 
 @Schema()
